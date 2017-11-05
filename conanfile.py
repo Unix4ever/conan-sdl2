@@ -8,9 +8,10 @@ class SDLConan(ConanFile):
     version = "2.0.5"
     folder = "SDL2-%s" % version
     settings = "os", "arch", "compiler", "build_type"
-    options = {"directx": [True, False], "shared": [True, False], "fPIC": [True, False]}
+    options = {"directx": [True, False], "shared": [True, False], "fPIC": [True, False], "x11_video": [True, False]}
     default_options = '''directx=False
     shared=False
+    x11_video=True
     fPIC=True'''
     exports = "CMakeLists.txt"
     generators = "cmake"
@@ -44,6 +45,13 @@ class SDLConan(ConanFile):
         """ Define your project building. You decide the way of building it
             to reuse it later in any other project.
         """
+
+        if not self.options.x11_video:
+            replace_in_file(
+                "%s/include/SDL_config.h" % self.folder,
+                "#define SDL_VIDEO_DRIVER_X11 1",
+                "/* #define SDL_VIDEO_DRIVER_X11 1 */",
+            )
 
         if self.settings.os == "Windows":
             self.build_with_cmake()
