@@ -46,13 +46,6 @@ class SDLConan(ConanFile):
             to reuse it later in any other project.
         """
 
-        if not self.options.x11_video:
-            replace_in_file(
-                "%s/include/SDL_config.h" % self.folder,
-                "#define SDL_VIDEO_DRIVER_X11 1",
-                "/* #define SDL_VIDEO_DRIVER_X11 1 */",
-            )
-
         if self.settings.os == "Windows":
             self.build_with_cmake()
         else:
@@ -64,9 +57,12 @@ class SDLConan(ConanFile):
         self.run("chmod a+x %s/configure" % self.folder)
 
         suffix = ""
+        configure_suffix = ""
         with_fpic = ""
         if self.settings.arch == "x86":
             suffix = 'CFLAGS="-m32" LDFLAGS="-m32"' # not working the env, dont know why
+        if not self.options.x11_video:
+            configure_suffix = '--enable-video-x11=no'
 
         env = ConfigureEnvironment(self.deps_cpp_info, self.settings)
         if self.options.fPIC:
@@ -85,6 +81,7 @@ class SDLConan(ConanFile):
             configure_command = 'cd %s && CC=$(pwd)/build-scripts/gcc-fat.sh && %s ./configure %s' % (self.folder, env_line, suffix)
         else:
             configure_command = 'cd %s && %s ./configure %s %s --enable-mir-shared=no' % (self.folder, env_line, suffix, with_fpic)
+        configure_command = '%s %s' % (configure_command, configure_suffix)
         self.output.warn("Configure with: %s" % configure_command)
         self.run(configure_command)
         self.run("cd %s && %s make %s" % (self.folder, env_line, suffix))
