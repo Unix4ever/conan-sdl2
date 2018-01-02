@@ -1,7 +1,7 @@
 from conans import ConanFile
-from conans.tools import download, unzip, replace_in_file
+from conans.tools import download, unzip, replace_in_file, environment_append
 import shutil
-from conans import CMake, ConfigureEnvironment
+from conans import CMake, AutoToolsBuildEnvironment
 
 class SDLConan(ConanFile):
     name = "SDL2"
@@ -58,33 +58,29 @@ class SDLConan(ConanFile):
 
         suffix = ""
         configure_suffix = ""
-        with_fpic = ""
         if self.settings.arch == "x86":
             suffix = 'CFLAGS="-m32" LDFLAGS="-m32"' # not working the env, dont know why
         if not self.options.x11_video:
             configure_suffix = '--enable-video-x11=no'
 
-        env = ConfigureEnvironment(self.deps_cpp_info, self.settings)
+        env = AutoToolsBuildEnvironment(self)
         if self.options.fPIC:
-            env_line = env.command_line.replace('CFLAGS="', 'CFLAGS="-fPIC ')
-            with_fpic += " --with-pic"
-        else:
-            env_line = env.command_line
-
-        env_line = env_line.replace('LIBS="', 'LIBS2="') # Rare error if LIBS is kept
+            env.fpic = True
 
         if self.settings.os == "Macos": # Fix rpath, we want empty rpaths, just pointing to lib file
-            old_str = "-install_name \$rpath/"
+            old_str = "-install_name \\$rpath/"
             new_str = "-install_name "
             replace_in_file("%s/configure" % self.folder, old_str, new_str)
             self.run("chmod a+x %s/build-scripts/gcc-fat.sh" % self.folder)
-            configure_command = 'cd %s && CC=$(pwd)/build-scripts/gcc-fat.sh && %s ./configure %s' % (self.folder, env_line, suffix)
+            configure_command = 'cd %s && CC=$(pwd)/build-scripts/gcc-fat.sh && ./configure %s' % (self.folder, suffix)
         else:
-            configure_command = 'cd %s && %s ./configure %s %s --enable-mir-shared=no' % (self.folder, env_line, suffix, with_fpic)
+            configure_command = 'cd %s && ./configure %s --enable-mir-shared=no' % (self.folder, suffix)
         configure_command = '%s %s' % (configure_command, configure_suffix)
         self.output.warn("Configure with: %s" % configure_command)
-        self.run(configure_command)
-        self.run("cd %s && %s make %s" % (self.folder, env_line, suffix))
+
+        with environment_append(env.vars):
+            self.run(configure_command)
+            self.run("cd %s && make %s" % (self.folder, suffix))
 
     def build_with_cmake(self):
         cmake = CMake(self.settings)
